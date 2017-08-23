@@ -42,11 +42,14 @@
 #include "canvas/Persistency/Common/FindManyP.h"
 
 // Data products include
+#include "nusimdata/SimulationBase/MCParticle.h"
 #include "lardataobj/MCBase/MCTrack.h"
+#include "lardataobj/MCBase/MCShower.h"
 #include "lardataobj/RecoBase/PFParticle.h"
 #include "lardataobj/RecoBase/OpHit.h"
 #include "lardataobj/RecoBase/OpFlash.h"
 #include "lardataobj/RecoBase/Track.h"
+#include "lardataobj/RecoBase/Shower.h"
 #include "lardataobj/RecoBase/Cluster.h"
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/RecoBase/SpacePoint.h"
@@ -118,9 +121,8 @@ private:
   std::string _cosmic_flash_match_producer;
   std::string _opflash_producer_beam;
   std::string _acpt_producer;
-  std::string _tpcobject_producer;
-  bool _recursiveMatching = false;
-  bool _debug = true;
+  bool _recursiveMatching;
+  bool _debug;
   int _minimumHitRequirement; ///< Minimum number of hits in at least a plane for a track
   bool _use_genie_info; ///< Turn this off if looking at cosmic only files
   double _beam_spill_start; 
@@ -140,21 +142,21 @@ private:
 
   TTree* _tree1;
   int _run, _subrun, _event;
-  int _muon_is_reco;
-  double _muon_reco_pur = -9999;
-  double _muon_reco_eff = -9999;
-  double _true_muon_mom = -9999;
-  double _true_muon_mom_matched = -9999;
-  int _nPFPtagged, _muon_is_flash_tagged;
-  double _muon_tag_score;
+  int _is_reco;
+  double _reco_pur = -9999;
+  double _reco_eff = -9999;
+  double _true_mom = -9999;
+  double _true_mom_matched = -9999;
+  int _nPFPtagged, _is_flash_tagged;
+  double _tag_score;
   double _fm_score;
   int _fv, _ccnc, _nupdg;
   double _nu_e;
-  double _recon_muon_start_x, _recon_muon_start_y, _recon_muon_start_z;
-  double _recon_muon_end_x, _recon_muon_end_y, _recon_muon_end_z;
-  double _mc_muon_start_x, _mc_muon_start_y, _mc_muon_start_z;
-  double _mc_muon_end_x, _mc_muon_end_y, _mc_muon_end_z;
-  int _mc_muon_contained;
+  double _reco_start_x, _reco_start_y, _reco_start_z;
+  double _reco_end_x, _reco_end_y, _reco_end_z;
+  double _mc_start_x, _mc_start_y, _mc_start_z;
+  double _mc_end_x, _mc_end_y, _mc_end_z;
+  int _mc_contained;
   double _vtx_resolution;
 
   int _nslices;
@@ -204,7 +206,7 @@ UBXSec::UBXSec(fhicl::ParameterSet const & p)
   :
   EDAnalyzer(p) 
 {
-  _pfp_producer                   = p.get<std::string>("PFParticleProducer");
+  _pfp_producer                   = p.get<std::string>("PFParticleProducer", "pandoraNu");
   _hitfinderLabel                 = p.get<std::string>("HitProducer");
   _geantModuleLabel               = p.get<std::string>("GeantModule");
   _spacepointLabel                = p.get<std::string>("SpacePointProducer");
@@ -220,6 +222,9 @@ UBXSec::UBXSec(fhicl::ParameterSet const & p)
   _beam_spill_start               = p.get<double>("BeamSpillStart", 3.2);
   _beam_spill_end                 = p.get<double>("BeamSpillEnd",   4.8);
 
+  _recursiveMatching		  = p.get<bool>("RecursiveMatching", false);
+  _debug			  = p.get<bool>("PrintDebug", true);
+
   _pecalib.Configure(p.get<fhicl::ParameterSet>("PECalib"));
 
   art::ServiceHandle<art::TFileService> fs;
@@ -227,32 +232,32 @@ UBXSec::UBXSec(fhicl::ParameterSet const & p)
   _tree1->Branch("run",                  &_run,                   "run/I");
   _tree1->Branch("subrun",               &_subrun,                "subrun/I");
   _tree1->Branch("event",                &_event,                 "event/I");
-  _tree1->Branch("muon_is_reco",         &_muon_is_reco,          "muon_is_reco/I");
-  _tree1->Branch("muon_reco_pur",        &_muon_reco_pur,         "muon_reco_pur/D");
-  _tree1->Branch("muon_reco_eff",        &_muon_reco_eff,         "muon_reco_eff/D");
-  _tree1->Branch("true_muon_mom",        &_true_muon_mom,         "true_muon_mom/D");
-  _tree1->Branch("true_muon_mom_matched",&_true_muon_mom_matched, "true_muon_mom_matched/D");
+  _tree1->Branch("is_reco",              &_is_reco,               "is_reco/I");
+  _tree1->Branch("reco_purity",          &_reco_pur,              "reco_pur/D");
+  _tree1->Branch("reco_efficiency",      &_reco_eff,              "reco_eff/D");
+  _tree1->Branch("true_momentum",        &_true_mom,              "true_mom/D");
+  _tree1->Branch("true_momentum_matched",&_true_mom_matched,      "true_mom_matched/D");
   _tree1->Branch("nPFPtagged",           &_nPFPtagged,            "nPFPtagged/I");
-  _tree1->Branch("muon_is_flash_tagged", &_muon_is_flash_tagged,  "muon_is_flash_tagged/I");
-  _tree1->Branch("muon_tag_score",       &_muon_tag_score,        "muon_tag_score/D");
+  _tree1->Branch("is_flash_tagged",      &_is_flash_tagged,       "is_flash_tagged/I");
+  _tree1->Branch("tag_score",            &_tag_score,             "tag_score/D");
   _tree1->Branch("fm_score",             &_fm_score,              "fm_score/D");
   _tree1->Branch("fv",                   &_fv,                    "fv/I");
   _tree1->Branch("ccnc",                 &_ccnc,                  "ccnc/I");
   _tree1->Branch("nupdg",                &_nupdg,                 "nupdg/I");
   _tree1->Branch("nu_e",                 &_nu_e,                  "nu_e/D");
-  _tree1->Branch("recon_muon_start_x",   &_recon_muon_start_x,    "recon_muon_start_x/D");
-  _tree1->Branch("recon_muon_start_y",   &_recon_muon_start_y,    "recon_muon_start_y/D");
-  _tree1->Branch("recon_muon_start_z",   &_recon_muon_start_z,    "recon_muon_start_z/D");
-  _tree1->Branch("recon_muon_end_x",     &_recon_muon_end_x,      "recon_muon_end_x/D");
-  _tree1->Branch("recon_muon_end_y",     &_recon_muon_end_y,      "recon_muon_end_y/D");
-  _tree1->Branch("recon_muon_end_z",     &_recon_muon_end_z,      "recon_muon_end_z/D");
-  _tree1->Branch("mc_muon_start_x",      &_mc_muon_start_x,       "mc_muon_start_x/D");
-  _tree1->Branch("mc_muon_start_y",      &_mc_muon_start_y,       "mc_muon_start_y/D");
-  _tree1->Branch("mc_muon_start_z",      &_mc_muon_start_z,       "mc_muon_start_z/D");
-  _tree1->Branch("mc_muon_end_x",        &_mc_muon_end_x,         "mc_muon_end_x/D");
-  _tree1->Branch("mc_muon_end_y",        &_mc_muon_end_y,         "mc_muon_end_y/D");
-  _tree1->Branch("mc_muon_end_z",        &_mc_muon_end_z,         "mc_muon_end_z/D");
-  _tree1->Branch("mc_muon_contained",    &_mc_muon_contained,     "mc_muon_contained/I");
+  _tree1->Branch("reco_start_x",         &_reco_start_x,          "reco_start_x/D");
+  _tree1->Branch("reco_start_y",         &_reco_start_y,          "reco_start_y/D");
+  _tree1->Branch("reco_start_z",         &_reco_start_z,          "reco_start_z/D");
+  _tree1->Branch("reco_end_x",           &_reco_end_x,            "reco_end_x/D");
+  _tree1->Branch("reco_end_y",           &_reco_end_y,            "reco_end_y/D");
+  _tree1->Branch("reco_end_z",           &_reco_end_z,            "reco_end_z/D");
+  _tree1->Branch("mc_start_x",           &_mc_start_x,            "mc_start_x/D");
+  _tree1->Branch("mc_start_y",           &_mc_start_y,            "mc_start_y/D");
+  _tree1->Branch("mc_start_z",           &_mc_start_z,            "mc_start_z/D");
+  _tree1->Branch("mc_end_x",             &_mc_end_x,              "mc_end_x/D");
+  _tree1->Branch("mc_end_y",             &_mc_end_y,              "mc_end_y/D");
+  _tree1->Branch("mc_end_z",             &_mc_end_z,              "mc_end_z/D");
+  _tree1->Branch("mc_contained",         &_mc_contained,          "mc_contained/I");
   _tree1->Branch("is_swtriggered",       &_is_swtriggered,        "is_swtriggered/I");
   _tree1->Branch("vtx_resolution",       &_vtx_resolution,        "vtx_resolution/D");
 
@@ -322,7 +327,7 @@ UBXSec::UBXSec(fhicl::ParameterSet const & p)
   _tree2->Branch("beam_spec",          "std::vector<double>", &_beam_spec);
   _tree2->Branch("fixx_spec",          "std::vector<double>", &_fixx_spec);
   _tree2->Branch("is_muon",            &_is_muon,            "is_muon/I");
-  _tree2->Branch("muon_is_reco",       &_muon_is_reco,       "muon_is_reco/I");
+  _tree2->Branch("is_reco",           &_is_reco,            "is_reco/I");
 
   _deadRegion2P = fs->make<TH2F>("deadRegion2P","deadRegion2P", 10350,0.0,1035.0,2300,-115.0,115.0);
   _deadRegion3P = fs->make<TH2F>("deadRegion3P","deadRegion3P", 10350,0.0,1035.0,2300,-115.0,115.0);
@@ -361,6 +366,14 @@ void UBXSec::analyze(art::Event const & e)
   lar_pandora::PFParticlesToTracks    pfParticleToTrackMap;
   lar_pandora::LArPandoraHelper::CollectTracks(e, _pfp_producer, allPfParticleTracks, pfParticleToTrackMap);
 
+
+  // Collect Showers and PFParticle <-> Shower Associations
+  // =====================================================
+  lar_pandora::ShowerVector allPfParticleShowers;
+  lar_pandora::PFParticlesToShowers pfParticleToShowerMap;
+  lar_pandora::LArPandoraHelper::CollectShowers(e, _pfp_producer, allPfParticleShowers, pfParticleToShowerMap);
+
+
   // Collect PFParticles and match Reco Particles to Hits
   //lar_pandora::PFParticleVector  recoParticleVector;
   //lar_pandora::PFParticleVector  recoNeutrinoVector;
@@ -391,8 +404,8 @@ void UBXSec::analyze(art::Event const & e)
   std::vector<art::Ptr<recob::PFParticle>> cosmicOriginPFP;
   art::Ptr<recob::PFParticle>              muonPFP;
   art::Ptr<simb::MCParticle>               muonMCParticle;
-  _muon_is_reco = 0;
-  _mc_muon_contained = 0;
+  _is_reco = 0;
+  _mc_contained = 0;
 
   if (_is_data) goto doanalysis;
 
@@ -422,7 +435,7 @@ void UBXSec::analyze(art::Event const & e)
       end[1] = mc_par->EndY();
       end[2] = mc_par->EndZ();
       if ( (mc_par->PdgCode() == 13 || mc_par->PdgCode() == -13) && UBXSecHelper::InFV(end) ){
-        std::cout << "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM Is stopping muon" << std::endl;
+        if(_debug) std::cout << "--- Stopping muon ---" << std::endl;
 
         lar_pandora::VertexVector          vertexVector;
         lar_pandora::PFParticlesToVertices particlesToVertices;
@@ -432,7 +445,7 @@ void UBXSec::analyze(art::Event const & e)
         double xyz[3];
         vertex_v[0]->XYZ(xyz);
 
-        std::cout << "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM The PFP has vtx x="<<xyz[0]<<" y="<<xyz[1]<<" z="<<xyz[2] << std::endl;
+        if(_debug) std::cout << "--- The PFP has vtx x="<<xyz[0]<<" y="<<xyz[1]<<" z="<<xyz[2] << " --- " << std::endl;
       }
          
     }
@@ -465,9 +478,9 @@ void UBXSec::analyze(art::Event const & e)
          std::cout << "Vz   " << mc_par->Vz()      << std::endl;
          std::cout << "T    " << mc_par->T()       << std::endl;
          double timeCorrection = 343.75;
-         std::cout << "Remeber a time correction of " << timeCorrection << std::endl;
+         if(_debug) std::cout << "Remeber a time correction of " << timeCorrection << std::endl;
          auto iter =  matchedParticleHits.find(mc_par);
-         std::cout << "Related hits: " << (iter->second).size() << std::endl;
+         if(_debug) std::cout << "Related hits: " << (iter->second).size() << std::endl;
        }    
        if (_debug) {
          std::cout << "  The related PFP: " << std::endl;
@@ -477,68 +490,130 @@ void UBXSec::analyze(art::Event const & e)
        neutrinoOriginPFP.emplace_back(pf_par);
 
        // If we matched a muon
-       if (mc_par->PdgCode() == 13 && mc_par->Mother() == 0) {
-         muonMCParticle = mc_par;
-         muonPFP = pf_par;
-         _muon_is_reco = 1;
+       if (mc_par->PdgCode() != 0) 
+       {
+         //muonMCParticle = mc_par;
+         //muonPFP = pf_par;
+         _is_reco = 1;
 
 
          // Muon track puritity and efficiency
-         _muon_reco_pur = _muon_reco_eff = -9999;
+         _reco_pur = _reco_eff = -9999;
          auto iter = recoParticlesToHits.find(pf_par);
          if (iter != recoParticlesToHits.end()) {
-           UBXSecHelper::GetTrackPurityAndEfficiency((*iter).second, _muon_reco_pur, _muon_reco_eff);
+           UBXSecHelper::GetTrackPurityAndEfficiency((*iter).second, _reco_pur, _reco_eff);
          }
-         _true_muon_mom_matched = mc_par->P();
-         //std::cout << "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY efficiency: " << eff << "  purity "  << pur << std::endl;
+         _true_mom_matched = mc_par->P();
+         if(_debug) std::cout << "-- efficiency: " << _reco_eff << "  purity: "  << _reco_pur << " --- " << std::endl;
 
-         lar_pandora::PFParticlesToTracks::const_iterator it =  pfParticleToTrackMap.find(pf_par);
-         if (it != pfParticleToTrackMap.end()) {
+         lar_pandora::PFParticlesToTracks::const_iterator iter1 =  pfParticleToTrackMap.find(pf_par);
+         if (iter1 != pfParticleToTrackMap.end()) {
 
-           lar_pandora::TrackVector trk_v = it->second;
-           std::cout << "Track vector length is: " << trk_v.size() << std::endl;
+           lar_pandora::TrackVector trk_v = iter1->second;
+           if(_debug) std::cout << "Track vector length is: " << trk_v.size() << std::endl;
            art::Ptr<recob::Track>   trk   = trk_v[0];
 
-           std::cout << "Recon muon start x " << trk->Vertex().X() << std::endl;
-           std::cout << "Recon muon start y " << trk->Vertex().Y() << std::endl;
-           std::cout << "Recon muon start z " << trk->Vertex().Z() << std::endl;
+	   if(_debug){
+             std::cout << "Reco track start x " << trk->Vertex().X() << std::endl;
+             std::cout << "Reco track start y " << trk->Vertex().Y() << std::endl;
+             std::cout << "Reco track start z " << trk->Vertex().Z() << std::endl;
+	   }
 
-           _recon_muon_start_x = trk->Vertex().X();
-           _recon_muon_start_y = trk->Vertex().Y();
-           _recon_muon_start_z = trk->Vertex().Z();
+           _reco_start_x = trk->Vertex().X();
+           _reco_start_y = trk->Vertex().Y();
+           _reco_start_z = trk->Vertex().Z();
 
-           std::cout << "Recon muon end x " << trk->End().X() << std::endl;
-           std::cout << "Recon muon end y " << trk->End().Y() << std::endl;
-           std::cout << "Recon muon end z " << trk->End().Z() << std::endl;
+	   if(_debug){
+             std::cout << "Reco track end x " << trk->End().X() << std::endl;
+             std::cout << "Reco track end y " << trk->End().Y() << std::endl;
+             std::cout << "Reco track end z " << trk->End().Z() << std::endl;
+	   }
 
-           _recon_muon_end_x = trk->End().X();
-           _recon_muon_end_y = trk->End().Y();
-           _recon_muon_end_z = trk->End().Z();
+           _reco_end_x = trk->End().X();
+           _reco_end_y = trk->End().Y();
+           _reco_end_z = trk->End().Z();
 
-           std::cout << "MC muon start x " << mc_par->Vx() << std::endl;
-           std::cout << "MC muon start y " << mc_par->Vy() << std::endl;
-           std::cout << "MC muon start z " << mc_par->Vz() << std::endl;
+	   if(_debug){
+             std::cout << "MC track start x " << mc_par->Vx() << std::endl;
+             std::cout << "MC track start y " << mc_par->Vy() << std::endl;
+             std::cout << "MC track start z " << mc_par->Vz() << std::endl;
+	   }
 
-           _mc_muon_start_x = mc_par->Vx();
-           _mc_muon_start_y = mc_par->Vy();
-           _mc_muon_start_z = mc_par->Vz();
+           _mc_start_x = mc_par->Vx();
+           _mc_start_y = mc_par->Vy();
+           _mc_start_z = mc_par->Vz();
 
-           std::cout << "MC muon end x " << mc_par->EndX() << std::endl;
-           std::cout << "MC muon end y " << mc_par->EndY() << std::endl;
-           std::cout << "MC muon end z " << mc_par->EndZ() << std::endl;
-       
-           _mc_muon_end_x = mc_par->EndX();
-           _mc_muon_end_y = mc_par->EndY();
-           _mc_muon_end_z = mc_par->EndZ();
+	   if(_debug){
+             std::cout << "MC track end x " << mc_par->EndX() << std::endl;
+             std::cout << "MC track end y " << mc_par->EndY() << std::endl;
+             std::cout << "MC track end z " << mc_par->EndZ() << std::endl;
+	   }       
+
+           _mc_end_x = mc_par->EndX();
+           _mc_end_y = mc_par->EndY();
+           _mc_end_z = mc_par->EndZ();
          }
 
-
-         double start[3] = {_mc_muon_start_x, _mc_muon_start_y, _mc_muon_start_z};
-         double stop[3]  = {_mc_muon_end_x,   _mc_muon_end_y,   _mc_muon_end_z};
+         double start[3] = {_mc_start_x, _mc_start_y, _mc_start_z};
+         double stop[3]  = {_mc_end_x,   _mc_end_y,   _mc_end_z};
 
          if (UBXSecHelper::InFV(start) && UBXSecHelper::InFV(stop))
-           _mc_muon_contained = 1;
-       }  
+           _mc_contained = 1;
+       }
+
+       lar_pandora::PFParticlesToShowers::const_iterator iter2 =  pfParticleToShowerMap.find(pf_par);
+       if (iter2 != pfParticleToShowerMap.end()) {
+
+         lar_pandora::ShowerVector shwr_v = iter2->second;
+         if(_debug) std::cout << "Shower vector length is: " << shwr_v.size() << std::endl;
+         //art::Ptr<recob::Shower>   shwr   = shwr_v[0];
+
+	 /*
+	 if(_debug){
+           std::cout << "Reco shower start x " << shwr->Vertex().X() << std::endl;
+           std::cout << "Reco shower start y " << shwr->Vertex().Y() << std::endl;
+           std::cout << "Reco shower start z " << shwr->Vertex().Z() << std::endl;
+	 }
+
+         _reco_start_x = shwr->Vertex().X();
+         _reco_start_y = shwr->Vertex().Y();
+         _reco_start_z = shwr->Vertex().Z();
+	 */
+
+	 /*
+	 if(_debug){
+           std::cout << "Reco shower end x " << shwr->End().X() << std::endl;
+           std::cout << "Reco shower end y " << shwr->End().Y() << std::endl;
+           std::cout << "Reco shower end z " << shwr->End().Z() << std::endl;
+	 }
+
+         _reco_end_x = shwr->End().X();
+         _reco_end_y = shwr->End().Y();
+         _reco_end_z = shwr->End().Z();
+	 */
+	
+	 if(_debug){
+           std::cout << "MC shower start x " << mc_par->Vx() << std::endl;
+           std::cout << "MC shower start y " << mc_par->Vy() << std::endl;
+           std::cout << "MC shower start z " << mc_par->Vz() << std::endl;
+	 }
+
+         _mc_start_x = mc_par->Vx();
+         _mc_start_y = mc_par->Vy();
+         _mc_start_z = mc_par->Vz();
+
+	 if(_debug){
+           std::cout << "MC shower end x " << mc_par->EndX() << std::endl;
+           std::cout << "MC shower end y " << mc_par->EndY() << std::endl;
+           std::cout << "MC shower end z " << mc_par->EndZ() << std::endl;
+	 }       
+
+         double start[3] = {_mc_start_x, _mc_start_y, _mc_start_z};
+         double stop[3]  = {_mc_end_x,   _mc_end_y,   _mc_end_z};
+
+         if (UBXSecHelper::InFV(start) && UBXSecHelper::InFV(stop))
+           _mc_contained = 1;
+       }
      }
   }
   if (_debug) std::cout << "Neutrino related PFPs in this event: " << neutrinoOriginPFP.size() << std::endl;
@@ -582,18 +657,23 @@ void UBXSec::analyze(art::Event const & e)
   art::Handle<std::vector<recob::Track>> track_h;
   e.getByLabel(_pfp_producer,track_h);
   if (!track_h.isValid() || track_h->empty()) {
-    std::cout << "[UBXSec] Track handle is not valid or empty." << std::endl;
+    std::cout << "[UBXSec] Track handle not valid / empty." << std::endl;
     //throw std::exception();
+  }
+  art::Handle<std::vector<recob::Shower>> shower_h;
+  e.getByLabel(_pfp_producer, shower_h);
+  if(!shower_h.isValid() || shower_h->empty()){
+    std::cout << "[UBXSec] Shower handle not valid /  empty." << std::endl;
   }
 
   art::FindManyP<recob::OpFlash> opfls_ptr_coll_v(track_h, e, _acpt_producer);
-  
+  //art::FindManyP<recob::OpFlash> opfls_ptr_coll_v_shower(shower_h, e, _acpt_producer);
 
   // Get Giuseppe's Kalman Tracks
   art::Handle<std::vector<recob::PFParticle> > pfp_h;
   e.getByLabel(_pfp_producer,pfp_h);
   if(!pfp_h.isValid()){
-    std::cout << "[UBXSec] Track product " << _pfp_producer << " not found..." << std::endl;
+    std::cout << "[UBXSec] Pproduct " << _pfp_producer << " not found..." << std::endl;
     //throw std::exception();
   }
   if(pfp_h->empty()) {
@@ -655,19 +735,18 @@ void UBXSec::analyze(art::Event const & e)
     }
 
     _nsignal = 0;
-    if(_nupdg==14 && _ccnc==0 && _fv==1) _nsignal=1; 
+    if(_nupdg==12 && _ccnc==0 && _fv==1) _nsignal=1; 
 
     // Also save muon momentum if is signal
-    _true_muon_mom = -9999.;
-    if (_nsignal == 1) {
+    _true_mom = -9999.;
+    //if (_nsignal == 1) {
       for (int p = 0; p < mclist[iList]->NParticles(); p++) {
         auto const & mcp = mclist[iList]->GetParticle(p);
-        if (mcp.Mother() != 0) continue;
-        if (mcp.PdgCode() != 13) continue;
-        _true_muon_mom = mcp.P();
+        //if (mcp.Mother() != 0) continue;
+        //if (mcp.PdgCode() != 13) continue;
+        _true_mom = mcp.P();
       }
-
-    }
+    //}
   }
 
   lar_pandora::PFParticlesToSpacePoints pfp_to_spacept;
@@ -687,6 +766,7 @@ void UBXSec::analyze(art::Event const & e)
 
  
   std::vector<lar_pandora::TrackVector     > track_v_v;
+<<<<<<< HEAD
   std::vector<lar_pandora::PFParticleVector> pfp_v_v;
   for (size_t slice = 0; slice < tpcobj_h->size(); slice++) {
     track_v_v.push_back(tpcobjToTrackAssns.at(slice));
@@ -695,6 +775,14 @@ void UBXSec::analyze(art::Event const & e)
 
 
   _nslices = tpcobj_h->size();
+=======
+  std::vector<lar_pandora::ShowerVector    > shower_v_v;
+  std::vector<lar_pandora::PFParticleVector> pfp_v_v_track;
+  std::vector<lar_pandora::PFParticleVector> pfp_v_v_shower;
+  UBXSecHelper::GetTPCObjects(e, _pfp_producer, pfp_v_v_track, track_v_v);
+  UBXSecHelper::GetTPCObjects(e, _pfp_producer, pfp_v_v_shower, shower_v_v);
+
+  _nslices = pfp_v_v_track.size();
   _slc_flsmatch_score.resize(_nslices, -9999);
   _slc_flsmatch_qllx.resize(_nslices, -9999);
   _slc_flsmatch_tpcx.resize(_nslices, -9999);
@@ -727,7 +815,41 @@ void UBXSec::analyze(art::Event const & e)
   _slc_n_intime_pe_closestpmt.resize(_nslices, -9999);
   _slc_maxdistance_vtxtrack.resize(_nslices, -9999);
 
-  std::cout << "UBXSec - SAVING INFORMATION" << std::endl;
+
+  _nslices = pfp_v_v_shower.size();
+  _slc_flsmatch_score.resize(_nslices, -9999);
+  _slc_flsmatch_qllx.resize(_nslices, -9999);
+  _slc_flsmatch_tpcx.resize(_nslices, -9999);
+  _slc_flsmatch_t0.resize(_nslices, -9999);
+  _slc_flsmatch_hypoz.resize(_nslices, -9999);
+  _slc_flsmatch_xfixed_chi2.resize(_nslices, -9999);
+  _slc_flsmatch_xfixed_ll.resize(_nslices, -9999);
+  _slc_nuvtx_x.resize(_nslices);
+  _slc_nuvtx_y.resize(_nslices);
+  _slc_nuvtx_z.resize(_nslices);
+  _slc_nuvtx_fv.resize(_nslices);
+  _slc_vtxcheck_angle.resize(_nslices);
+  _slc_origin.resize(_nslices);
+  _slc_flshypo_xfixed_spec.resize(_nslices);
+  _slc_flshypo_spec.resize(_nslices);
+  _slc_nhits_u.resize(_nslices, -9999);
+  _slc_nhits_v.resize(_nslices, -9999);
+  _slc_nhits_w.resize(_nslices, -9999);
+  _slc_flsmatch_cosmic_score.resize(_nslices, -9999);
+  _slc_flsmatch_cosmic_t0.resize(_nslices, -9999);
+  _slc_longesttrack_length.resize(_nslices, -9999);
+  _slc_acpt_outoftime.resize(_nslices, -9999);
+  _slc_crosses_top_boundary.resize(_nslices, -9999);
+  _slc_nuvtx_closetodeadregion_u.resize(_nslices, -9999);
+  _slc_nuvtx_closetodeadregion_v.resize(_nslices, -9999);
+  _slc_nuvtx_closetodeadregion_w.resize(_nslices, -9999);  
+  _slc_kalman_chi2.resize(_nslices, -9999);
+  _slc_kalman_ndof.resize(_nslices, -9999);  
+  _slc_passed_min_track_quality.resize(_nslices, -9999);
+  _slc_n_intime_pe_closestpmt.resize(_nslices, -9999);
+  _slc_maxdistance_vtxtrack.resize(_nslices, -9999);
+
+  if(_debug) std::cout << "UBXSec - SAVING INFORMATION" << std::endl;
   _vtx_resolution = -9999;
   for (unsigned int slice = 0; slice < tpcobj_h->size(); slice++){
     std::cout << ">>> SLICE" << slice << std::endl;
@@ -831,13 +953,13 @@ void UBXSec::analyze(art::Event const & e)
 
     // Track quality
     _slc_kalman_chi2[slice] = -9999;
-    for (unsigned int t = 0; t < pfp_v_v[slice].size(); t++) {
-      if(trk_kalman_v.at(pfp_v_v[slice][t].key()).size()>1) {
-        std::cout << "[UBXSec] TQ more than one track per PFP, ntracks " << trk_kalman_v.at(pfp_v_v[slice][t].key()).size() << std::endl;
-      } else if (trk_kalman_v.at(pfp_v_v[slice][t].key()).size()==0){
+    for (unsigned int t = 0; t < pfp_v_v_track[slice].size(); t++) {
+      if(trk_kalman_v.at(pfp_v_v_track[slice][t].key()).size()>1) {
+        std::cout << "[UBXSec] TQ more than one track per PFP, ntracks " << trk_kalman_v.at(pfp_v_v_track[slice][t].key()).size() << std::endl;
+      } else if (trk_kalman_v.at(pfp_v_v_track[slice][t].key()).size()==0){
         continue;
       } else {
-        art::Ptr<recob::Track> trk_ptr = trk_kalman_v.at(pfp_v_v[slice][t].key()).at(0);
+        art::Ptr<recob::Track> trk_ptr = trk_kalman_v.at(pfp_v_v_track[slice][t].key()).at(0);
         _slc_kalman_chi2[slice] = trk_ptr->Chi2();
         _slc_kalman_ndof[slice] = trk_ptr->Ndof();
       }
@@ -860,14 +982,15 @@ void UBXSec::analyze(art::Event const & e)
     _slc_nuvtx_closetodeadregion_w[slice] = (UBXSecHelper::PointIsCloseToDeadRegion(reco_nu_vtx, 2) ? 1 : 0);
 
     // Vertex check
-    recob::Vertex slice_vtx = tpcobj.GetVertex();
+    recob::Vertex slice_vtx;
+    UBXSecHelper::GetNuVertexFromTPCObject(e, _pfp_producer, pfp_v_v_track[slice], slice_vtx);
     ubxsec::VertexCheck vtxCheck(track_v_v[slice], slice_vtx);
     _slc_vtxcheck_angle[slice] = vtxCheck.AngleBetweenLongestTracks();
     
     // OpHits
     std::vector<ubxsec::Hit3D_t> hit3d_v;
     hit3d_v.clear();
-    for (auto pfp : pfp_v_v[slice]) {
+    for (auto pfp : pfp_v_v_track[slice]) {
       auto iter = pfp_to_spacept.find(pfp);
       if (iter != pfp_to_spacept.end()) {
         //std::cout << "[UBXSec] Found related spacepoints, size is " << (iter->second).size() << std::endl;
@@ -927,6 +1050,214 @@ void UBXSec::analyze(art::Event const & e)
 
 
     // Distance from recon nu vertex to thefar away track in TPCObject
+    //_slc_maxdistance_vtxtrack = UBXSecHelper::GetMaxTrackVertexDistance();
+
+
+    std::cout << "UBXSec - INFORMATION SAVED" << std::endl;
+  } // slice loop
+
+
+  for (unsigned int slice = 0; slice < pfp_v_v_shower.size(); slice++){
+    std::cout << ">>> SLICE" << slice << std::endl;
+
+    // Slice origin (0 is neutrino, 1 is cosmic)
+    _slc_origin[slice] = UBXSecHelper::GetSliceOrigin(neutrinoOriginPFP, cosmicOriginPFP, pfp_v_v_shower[slice]);
+
+    // Reco vertex
+    double reco_nu_vtx[3];
+    UBXSecHelper::GetNuVertexFromTPCObject(e, _pfp_producer, pfp_v_v_shower[slice], reco_nu_vtx);
+    _slc_nuvtx_x[slice] = reco_nu_vtx[0];
+    _slc_nuvtx_y[slice] = reco_nu_vtx[1];
+    _slc_nuvtx_z[slice] = reco_nu_vtx[2];
+    _slc_nuvtx_fv[slice] = (UBXSecHelper::InFV(reco_nu_vtx) ? 1 : 0);
+    std::cout << "    Reco vertex saved" << std::endl;
+
+    // Vertex resolution
+    if (_slc_origin[slice] == 0) {
+      _vtx_resolution = sqrt( pow(_slc_nuvtx_y[slice]-_tvtx_y[0], 2) + pow(_slc_nuvtx_z[slice]-_tvtx_z[0], 2) );
+    } 
+
+    // Neutrino Flash match
+    _slc_flsmatch_score[slice] = -9999;
+    art::Ptr<recob::PFParticle> NuPFP = UBXSecHelper::GetNuPFP(pfp_v_v_shower[slice]);
+    std::vector<art::Ptr<ubana::FlashMatch>> pfpToFlashMatch_v = pfpToNeutrinoFlashMatchAssns.at(NuPFP.key());
+    if (pfpToFlashMatch_v.size() > 1) {
+      std::cout << "    More than one flash match per nu pfp ?!" << std::endl;
+      continue;
+    } else if (pfpToFlashMatch_v.size() == 0){
+      // do nothing
+    } else {
+      _slc_flsmatch_score[slice]       = pfpToFlashMatch_v[0]->GetScore(); 
+      _slc_flsmatch_qllx[slice]        = pfpToFlashMatch_v[0]->GetEstimatedX();
+      _slc_flsmatch_tpcx[slice]        = pfpToFlashMatch_v[0]->GetTPCX();
+      _slc_flsmatch_t0[slice]          = pfpToFlashMatch_v[0]->GetT0();
+      _slc_flsmatch_hypoz[slice]       = UBXSecHelper::GetFlashZCenter(pfpToFlashMatch_v[0]->GetHypoFlashSpec());
+      _slc_flsmatch_xfixed_chi2[slice] = pfpToFlashMatch_v[0]->GetXFixedChi2();
+      _slc_flsmatch_xfixed_ll[slice]   = pfpToFlashMatch_v[0]->GetXFixedLl();
+      _slc_flshypo_xfixed_spec[slice]  = pfpToFlashMatch_v[0]->GetXFixedHypoFlashSpec();
+      _slc_flshypo_spec[slice]         = pfpToFlashMatch_v[0]->GetHypoFlashSpec();
+      for (auto v : _slc_flshypo_spec[slice]) std::cout << "PE: " << v << std::endl;
+
+      std::cout << "    FM score: " << _slc_flsmatch_score[slice] << std::endl;
+    }
+
+    // Cosmic Flash Match
+    _slc_flsmatch_cosmic_score[slice] = -9999;
+    /*
+    std::vector<art::Ptr<ubana::FlashMatch>> pfpToCosmicFlashMatch_v = pfpToCosmicFlashMatchAssns.at(NuPFP.key());
+    if (pfpToCosmicFlashMatch_v.size() > 1) {
+      std::cout << "    More than one flash match per nu pfp!" << std::endl;
+      continue;
+    } else if (pfpToCosmicFlashMatch_v.size() == 0){
+      std::cout << "    PFP to flash match ass for cosmic is zero." << std::endl;
+      //continue;
+    } else if (pfpToCosmicFlashMatch_v.size() == 1){
+      //std::cout << "pfpToCosmicFlashMatch_v[0]->GetScore() is " << pfpToCosmicFlashMatch_v[0]->GetScore() << std::endl;
+      //std::cout << "pfpToCosmicFlashMatch_v[0]->GetT0() is " << pfpToCosmicFlashMatch_v[0]->GetT0() << std::endl;
+      _slc_flsmatch_cosmic_score[slice] = pfpToCosmicFlashMatch_v[0]->GetScore();
+      _slc_flsmatch_cosmic_t0[slice]    = pfpToCosmicFlashMatch_v[0]->GetT0();
+    } else {
+      std::cout << "    I don't know what fucking case this is." << std::endl;
+    }
+    */
+
+    // Hits
+    int nhits_u, nhits_v, nhits_w;
+    UBXSecHelper::GetNumberOfHitsPerPlane(e, _pfp_producer, shower_v_v[slice], nhits_u, nhits_v, nhits_w);
+    _slc_nhits_u[slice] = nhits_u;
+    _slc_nhits_v[slice] = nhits_v;
+    _slc_nhits_w[slice] = nhits_w;
+
+    /*
+    // Longest track and check boundary
+    recob::Shower lt;
+    if (UBXSecHelper::GetLongestTrackFromTPCObj(shower_v_v[slice], lt)){
+      _slc_longesttrack_length[slice] = lt.Length();
+      int vtx_ok;
+      _slc_crosses_top_boundary[slice] = (UBXSecHelper::IsCrossingTopBoundary(lt, vtx_ok) ? 1 : 0);
+    } else {
+      _slc_longesttrack_length[slice] = -9999;
+    }
+    */
+
+    /*
+    // ACPT
+    _slc_acpt_outoftime[slice] = 0;
+    for (unsigned int t = 0; t < track_v_v[slice].size(); t++) {
+      if(opfls_ptr_coll_v.at(track_v_v[slice][t].key()).size()>1) {
+        std::cout << "[UBXSec] More than 1 association found (ACPT)!" << std::endl;
+        //throw std::exception();
+      } else if (opfls_ptr_coll_v.at(track_v_v[slice][t].key()).size()==0){
+        continue;
+      } else {
+        art::Ptr<recob::OpFlash> flash_ptr = opfls_ptr_coll_v.at(track_v_v[slice][t].key()).at(0);
+        if (flash_ptr->Time() < _beam_spill_start || flash_ptr->Time() > _beam_spill_end) {
+          _slc_acpt_outoftime[slice] = 1;
+        }
+      }
+    }
+    */
+    /*
+    // Track quality
+    _slc_kalman_chi2[slice] = -9999;
+    for (unsigned int t = 0; t < pfp_v_v_track[slice].size(); t++) {
+      if(trk_kalman_v.at(pfp_v_v_track[slice][t].key()).size()>1) {
+        std::cout << "[UBXSec] TQ more than one track per PFP, ntracks " << trk_kalman_v.at(pfp_v_v_track[slice][t].key()).size() << std::endl;
+      } else if (trk_kalman_v.at(pfp_v_v_track[slice][t].key()).size()==0){
+        continue;
+      } else {
+        art::Ptr<recob::Track> trk_ptr = trk_kalman_v.at(pfp_v_v_track[slice][t].key()).at(0);
+        _slc_kalman_chi2[slice] = trk_ptr->Chi2();
+        _slc_kalman_ndof[slice] = trk_ptr->Ndof();
+      }
+    }
+    bool goodTrack = false;
+    for (auto trk : track_v_v[slice]) {
+      if (!deadRegionsFinder.NearDeadReg2P( (trk->Vertex()).Y(), (trk->Vertex()).Z(), 0.6 )  &&
+          !deadRegionsFinder.NearDeadReg2P( (trk->End()).Y(),    (trk->End()).Z(),    0.6 )  &&
+          UBXSecHelper::TrackPassesHitRequirment(e, _pfp_producer, trk, _minimumHitRequirement) ) {
+        goodTrack = true;
+        continue;
+      }
+    }
+    if (goodTrack) _slc_passed_min_track_quality[slice] = true;
+    else _slc_passed_min_track_quality[slice] = false;
+    */
+
+    // Channel status
+    _slc_nuvtx_closetodeadregion_u[slice] = (UBXSecHelper::PointIsCloseToDeadRegion(reco_nu_vtx, 0) ? 1 : 0);
+    _slc_nuvtx_closetodeadregion_v[slice] = (UBXSecHelper::PointIsCloseToDeadRegion(reco_nu_vtx, 1) ? 1 : 0);
+    _slc_nuvtx_closetodeadregion_w[slice] = (UBXSecHelper::PointIsCloseToDeadRegion(reco_nu_vtx, 2) ? 1 : 0);
+
+    // Vertex check
+    recob::Vertex slice_vtx;
+    UBXSecHelper::GetNuVertexFromTPCObject(e, _pfp_producer, pfp_v_v_shower[slice], slice_vtx);
+    ubxsec::VertexCheck vtxCheck(shower_v_v[slice], slice_vtx);
+    //_slc_vtxcheck_angle[slice] = vtxCheck.AngleBetweenLongestTracks();
+    
+    // OpHits
+    std::vector<ubxsec::Hit3D_t> hit3d_v;
+    hit3d_v.clear();
+    for (auto pfp : pfp_v_v_shower[slice]) {
+      auto iter = pfp_to_spacept.find(pfp);
+      if (iter != pfp_to_spacept.end()) {
+        //std::cout << "[UBXSec] Found related spacepoints, size is " << (iter->second).size() << std::endl;
+      } else {
+        if(_debug) std::cout << "[UBXSec] Can't find spacepoints for pfp with pdg " << pfp->PdgCode() << std::endl;
+        continue;
+      }
+      // Loop through the hits associated 
+      for (auto sp_pt : (iter->second)) {
+        auto iter2 = spacept_to_hits.find(sp_pt);
+        if (iter2 != spacept_to_hits.end()) {
+          //std::cout << "[UBXSec] Founds hits associated to this sp_pt" << std::endl;
+        } else {
+          if(_debug) std::cout << "[UBXSec] Can't find hits ass to this sp_pt" << std::endl;
+          continue;
+        }   
+        // Save sp_pt position and hit charge for all the sp_pt you have
+        auto hit = iter2->second;
+        ubxsec::Hit3D_t thishit;
+        thishit.x = sp_pt->XYZ()[0];
+        thishit.y = sp_pt->XYZ()[1];
+        thishit.z = sp_pt->XYZ()[2];
+        thishit.q = hit->Integral();
+        hit3d_v.emplace_back(thishit);
+      }
+    }
+    std::cout << "[UBXSec] For this TPC object we have " << hit3d_v.size() << " Hit3D_t hits." << std::endl;
+
+    // Now construct average position
+    double sumx = 0, sumy = 0, sumz = 0;
+    double totq = 0;
+    for (auto hit3d : hit3d_v) {
+      sumx += hit3d.q * hit3d.x;
+      sumy += hit3d.q * hit3d.y;
+      sumz += hit3d.q * hit3d.z;
+      
+      totq += hit3d.q; 
+    }
+    double charge_center[3] = {sumx / totq, sumy / totq, sumz / totq};
+
+    int this_opch = UBXSecHelper::GetClosestPMT(charge_center);
+
+    // Look at the opHits from this pmt
+    int n_intime_ophits = 0;
+    double n_intime_pe = 0;
+    for (size_t oh = 0; oh < ophit_h->size(); oh++) {
+      auto const & ophit = (*ophit_h)[oh];
+      if (ophit.OpChannel() != this_opch) continue;
+      if (ophit.PeakTime() > _beam_spill_start && ophit.PeakTime() < _beam_spill_end) {
+        n_intime_ophits ++;
+        size_t opdet = geo->OpDetFromOpChannel(ophit.OpChannel());
+        n_intime_pe += _pecalib.BeamPE(opdet,ophit.Area(),ophit.Amplitude());
+      }     
+    } // end loop ophit
+
+    _slc_n_intime_pe_closestpmt[slice] = n_intime_pe;
+
+
+    // Distance from reco nu vertex to thefar away track in TPCObject
     //_slc_maxdistance_vtxtrack = UBXSecHelper::GetMaxTrackVertexDistance();
 
 

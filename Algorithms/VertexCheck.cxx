@@ -20,6 +20,14 @@ namespace ubxsec {
     _max_distance   = 10.;
   }
 
+  VertexCheck::VertexCheck(lar_pandora::ShowerVector tpcObj, recob::Vertex vtx) {
+    _tpcObjIsSet = _vtxIsSet = true;
+    _shower_v = tpcObj;
+    _vtx = vtx;
+    _max_distance   = 10.;
+  }
+
+
   void VertexCheck::Configure(fhicl::ParameterSet const& pset)
   {
     _max_distance   = pset.get< double > ( "MaxDistance" );
@@ -36,6 +44,13 @@ namespace ubxsec {
     _tpcObjIsSet = true;
     _track_v = tpcObj;
   }
+
+  void VertexCheck::SetTPCObj(lar_pandora::ShowerVector tpcObj) {
+    _tpcObjIsSet = true;
+    _shower_v = tpcObj;
+  }
+
+
 
   void VertexCheck::SetVtx(recob::Vertex vtx){
     _vtxIsSet = true;

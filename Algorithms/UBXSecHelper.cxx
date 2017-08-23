@@ -337,6 +337,96 @@ void UBXSecHelper::GetTPCObjects(art::Event const & e,
 
 }
 
+//______________________________________________________________________________________
+void UBXSecHelper::GetTPCObjects(art::Event const & e, 
+                                    std::string _particleLabel, 
+                                    std::vector<lar_pandora::PFParticleVector> & pfp_v_v, 
+                                    std::vector<lar_pandora::ShowerVector> & shower_v_v){
+
+  //Vectors and maps we will use to store Pandora information
+  lar_pandora::PFParticleVector pfParticleList;              //vector of PFParticles
+  lar_pandora::PFParticlesToClusters pfParticleToClusterMap; //PFParticle-to-cluster map
+
+  //Use LArPandoraHelper functions to collect Pandora information
+  lar_pandora::LArPandoraHelper::CollectPFParticles(e, _particleLabel, pfParticleList, pfParticleToClusterMap); //collect PFParticles and build map PFParticles to Clusters
+
+  // Collect vertices and tracks
+  lar_pandora::VertexVector           allPfParticleVertices;
+  lar_pandora::PFParticlesToVertices  pfParticleToVertexMap;
+  lar_pandora::LArPandoraHelper::CollectVertices(e, _particleLabel, allPfParticleVertices, pfParticleToVertexMap);
+  lar_pandora::ShowerVector            allPfParticleShowers;
+  lar_pandora::PFParticlesToShowers    pfParticleToShowerMap;
+  lar_pandora::LArPandoraHelper::CollectShowers(e, _particleLabel, allPfParticleShowers, pfParticleToShowerMap);
+
+  GetTPCObjects(pfParticleList, pfParticleToShowerMap, pfParticleToVertexMap, pfp_v_v, shower_v_v);
+}
+
+//______________________________________________________________________________________
+void UBXSecHelper::GetTPCObjects(art::Event const & e,
+                                    std::string _particleLabel,
+                                    std::string _showerLabel,
+                                    std::vector<lar_pandora::PFParticleVector> & pfp_v_v,
+                                    std::vector<lar_pandora::ShowerVector> & shower_v_v){
+
+  //Vectors and maps we will use to store Pandora information
+  lar_pandora::PFParticleVector pfParticleList;              //vector of PFParticles
+  lar_pandora::PFParticlesToClusters pfParticleToClusterMap; //PFParticle-to-cluster map
+
+  //Use LArPandoraHelper functions to collect Pandora information
+  lar_pandora::LArPandoraHelper::CollectPFParticles(e, _particleLabel, pfParticleList, pfParticleToClusterMap); //collect PFParticles and build map PFParticles to Clusters
+
+  // Collect vertices and tracks
+  lar_pandora::VertexVector           allPfParticleVertices;
+  lar_pandora::PFParticlesToVertices  pfParticleToVertexMap;
+  lar_pandora::LArPandoraHelper::CollectVertices(e, _particleLabel, allPfParticleVertices, pfParticleToVertexMap);
+  lar_pandora::ShowerVector            allPfParticleShowers;
+  lar_pandora::PFParticlesToShowers    pfParticleToShowerMap;
+  lar_pandora::LArPandoraHelper::CollectShowers(e, _showerLabel, allPfParticleShowers, pfParticleToShowerMap);
+
+  GetTPCObjects(pfParticleList, pfParticleToShowerMap, pfParticleToVertexMap, pfp_v_v, shower_v_v);
+}
+
+//______________________________________________________________________________________
+void UBXSecHelper::GetTPCObjects(art::Event const & e,
+                                    std::string _particleLabel,
+                                    std::string _showerLabel,
+                                    std::vector<lar_pandora::PFParticleVector> & pfp_v_v,
+                                    std::vector<lar_pandora::ShowerVector> & shower_v_v,
+                                    lar_pandora::PFParticlesToSpacePoints & pfp_to_spacept,
+                                    lar_pandora::SpacePointsToHits & spacept_to_hits){
+
+  //Vectors and maps we will use to store Pandora information
+  lar_pandora::PFParticleVector pfParticleList;              //vector of PFParticles
+  lar_pandora::PFParticlesToClusters pfParticleToClusterMap; //PFParticle-to-cluster map
+
+  //Use LArPandoraHelper functions to collect Pandora information
+  lar_pandora::LArPandoraHelper::CollectPFParticles(e, _particleLabel, pfParticleList, pfParticleToClusterMap); //collect PFParticles and build map PFParticles to Clusters
+
+  // Collect vertices and tracks
+  lar_pandora::VertexVector           allPfParticleVertices;
+  lar_pandora::PFParticlesToVertices  pfParticleToVertexMap;
+  lar_pandora::LArPandoraHelper::CollectVertices(e, _particleLabel, allPfParticleVertices, pfParticleToVertexMap);
+  lar_pandora::ShowerVector            allPfParticleShowers;
+  lar_pandora::PFParticlesToShowers    pfParticleToShowerMap;
+  lar_pandora::LArPandoraHelper::CollectShowers(e, _showerLabel, allPfParticleShowers, pfParticleToShowerMap);
+
+  // Also collect spacepoints in this case
+  lar_pandora::PFParticleVector temp2;
+  lar_pandora::LArPandoraHelper::CollectPFParticles(e, _particleLabel, temp2, pfp_to_spacept);
+
+  std::cout << "[UBXSecHelper] Looping over pfp_to_spacept map:" << std::endl;
+  for (auto const& iter : pfp_to_spacept) {
+    std::cout << "[UBXSecHelper]   pfp id: " <<  (iter.first)->Self() << ", number of spacepoints: " << (iter.second).size() << std::endl;
+  }
+
+  lar_pandora::SpacePointVector temp3;
+  lar_pandora::LArPandoraHelper::CollectSpacePoints (e, _particleLabel, temp3, spacept_to_hits);
+   
+
+  GetTPCObjects(pfParticleList, pfParticleToShowerMap, pfParticleToVertexMap, pfp_v_v, shower_v_v);
+
+}
+
 //____________________________________________________________
 void UBXSecHelper::GetNuVertexFromTPCObject(art::Event const & e, 
                                                std::string _particleLabel,
@@ -476,6 +566,93 @@ void UBXSecHelper::GetTPCObjects(lar_pandora::PFParticleVector pfParticleList,
 }
 
 
+//______________________________________________________________________________________
+void UBXSecHelper::GetTPCObjects(lar_pandora::PFParticleVector pfParticleList, 
+                                 lar_pandora::PFParticlesToShowers pfParticleToShowerMap, 
+                                 lar_pandora::PFParticlesToVertices  pfParticleToVertexMap, 
+                                 std::vector<lar_pandora::PFParticleVector> & pfp_v_v, 
+                                 std::vector<lar_pandora::ShowerVector> & shower_v_v) {
+
+  shower_v_v.clear();
+  pfp_v_v.clear();
+
+  std::cout << "[UBXSecHelper] Getting TPC Objects..." << std::endl;
+
+  for (unsigned int n = 0; n < pfParticleList.size(); ++n) {
+    const art::Ptr<recob::PFParticle> particle = pfParticleList.at(n);
+
+    if(lar_pandora::LArPandoraHelper::IsNeutrino(particle)) {
+      std::cout << "[UBXSecHelper] \t Creating TPC Object " << shower_v_v.size() << std::endl;
+      //std::cout << "IS NEUTRINO, pfp id " << particle->Self() << std::endl;
+      lar_pandora::VertexVector nu_vertex_v;
+      auto search = pfParticleToVertexMap.find(particle);
+      if(search != pfParticleToVertexMap.end()) {
+        nu_vertex_v = search->second;
+      }
+
+      double nu_vertex_xyz[3]={0.,0.,0.};
+      nu_vertex_v[0]->XYZ(nu_vertex_xyz);
+      //if (!this->InFV(nu_vertex_xyz)) continue;
+
+      lar_pandora::ShowerVector shower_v;
+      lar_pandora::PFParticleVector pfp_v;
+
+      CollectShowersAndPFP(pfParticleToShowerMap, pfParticleList, particle, pfp_v, shower_v);
+
+      pfp_v_v.emplace_back(pfp_v);
+      shower_v_v.emplace_back(shower_v);
+
+      std::cout << "[UBXSecHelper] \t Number of pfp for this TPC object: "    << pfp_v.size()   << std::endl;
+      for (auto pfp : pfp_v) {
+        std::cout << "[UBXSecHelper] \t \t PFP " << pfp->Self() << " with pdg " << pfp->PdgCode();
+        auto it = pfParticleToVertexMap.find(pfp);
+        if (it == pfParticleToVertexMap.end()) {
+           std::cout << " and vertex [vertex not available for this PFP]" << std::endl;
+        } else {
+          double xyz[3];
+          (it->second)[0]->XYZ(xyz);
+          std::cout << " and vertex " << xyz[0] << " " << xyz[1] << " " << xyz[2] << std::endl;   
+        }
+      }
+      std::cout << std::endl; 
+      std::cout << "[UBXSecHelper] \t Number of showers for this TPC object: " << shower_v.size() << std::endl;
+
+      //for (unsigned int i = 0; i < pfp_v.size(); i++) std::cout << "   pfp with ID " << pfp_v[i]->Self() << std::endl;
+    } // end if neutrino
+  } // end pfp loop
+
+}
+
+
+
+//______________________________________________________________________________________________________________________________________
+void UBXSecHelper::CollectShowersAndPFP(lar_pandora::PFParticlesToShowers pfParticleToShowerMap,
+                                          lar_pandora::PFParticleVector pfParticleList,
+                                          art::Ptr<recob::PFParticle> particle,
+                                          lar_pandora::PFParticleVector &pfp_v,
+                                          lar_pandora::ShowerVector &shower_v) {
+
+  pfp_v.emplace_back(particle);
+
+  lar_pandora::PFParticlesToShowers::const_iterator showerMapIter = pfParticleToShowerMap.find(particle);
+  if (showerMapIter != pfParticleToShowerMap.end()) {
+    lar_pandora::ShowerVector showers = showerMapIter->second;
+    std::cout << "[UBXSecHelper] \t PFP " << particle->Self() << " has " << showers.size() << " showers ass." << std::endl;
+    for (unsigned int shwr = 0; shwr < showers.size(); shwr++) {
+      shower_v.emplace_back(showers[shwr]);
+    }
+  }
+  const std::vector<size_t> &daughterIDs = particle->Daughters();
+  if(daughterIDs.size() == 0) return;
+  else {
+    for (unsigned int m = 0; m < daughterIDs.size(); ++m) {
+      const art::Ptr<recob::PFParticle> daughter = pfParticleList.at(daughterIDs.at(m));
+      CollectShowersAndPFP(pfParticleToShowerMap, pfParticleList, daughter, pfp_v, shower_v);
+    }
+  }
+
+}
+
 
 //______________________________________________________________________________________________________________________________________
 void UBXSecHelper::CollectTracksAndPFP(lar_pandora::PFParticlesToTracks pfParticleToTrackMap,
@@ -596,6 +773,41 @@ bool UBXSecHelper::TrackPassesHitRequirment(art::Event const & e,
     return true;
   else
     return false;
+
+}
+
+//______________________________________________________________________________
+
+void UBXSecHelper::GetNumberOfHitsPerPlane(art::Event const & e,
+                                              std::string _particleLabel,
+                                              lar_pandora::ShowerVector shower_v,
+                                              int & nhits_u, 
+                                              int & nhits_v, 
+                                              int & nhits_w ) {
+ 
+  nhits_u = 0;
+  nhits_v = 0;
+  nhits_w = 0;
+
+  lar_pandora::ShowerVector showerVector;
+  lar_pandora::ShowersToHits showersToHits;
+  lar_pandora::LArPandoraHelper::CollectShowers( e, _particleLabel, showerVector, showersToHits );
+
+  // Loop over the tracks in this TPC Object
+  for (unsigned int t = 0; t < shower_v.size(); t++) {
+
+    // Get the hits associated with the track
+    lar_pandora::HitVector hit_v = showersToHits.at(shower_v[t]);
+
+    // Check where the hit is coming from
+    for (unsigned int h = 0; h < hit_v.size(); h++){
+
+      if (hit_v[h]->View() == 0) nhits_u++;
+      if (hit_v[h]->View() == 1) nhits_v++;
+      if (hit_v[h]->View() == 2) nhits_w++;
+
+    }
+  }
 
 }
 

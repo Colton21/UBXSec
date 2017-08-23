@@ -38,6 +38,7 @@ namespace ubxsec{
 
     /// Construct setting TPC object and Vertex
     VertexCheck(lar_pandora::TrackVector, recob::Vertex);
+    VertexCheck(lar_pandora::ShowerVector, recob::Vertex);
 
     /// Default destructor
     ~VertexCheck(){}
@@ -50,7 +51,8 @@ namespace ubxsec{
 
     /// Sets the TPC object
     void SetTPCObj(lar_pandora::TrackVector);
-    
+    void SetTPCObj(lar_pandora::ShowerVector);    
+
     /// Sets the TPC object
     void SetVtx(recob::Vertex);
 
@@ -65,7 +67,8 @@ namespace ubxsec{
 
   protected:
 
-    lar_pandora::TrackVector _track_v; ///< the TPC object
+    lar_pandora::TrackVector _track_v; ///< the Track TPC object
+    lar_pandora::ShowerVector _shower_v; ///< the Shower TPC object
     recob::Vertex            _vtx;     ///< the vertex
     double _max_distance;
     bool _tpcObjIsSet, _vtxIsSet;

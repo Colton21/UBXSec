@@ -130,10 +130,69 @@ class UBXSecHelper {
    *  @param particle the PFP
    *  @param pfp_v output, a vector of PFP (the TPC object)
    *  @param track_v output, a of tracks (the TPC object)   */
+
+
+  static void GetTPCObjects(art::Event const & e, std::string _particleLabel, std::vector<lar_pandora::PFParticleVector> & pfp_v_v, std::vector<lar_pandora::ShowerVector> & shower_v_v);
+
+  /**
+   *  @brief Constructs TPC objects using Pandora PFP slices
+   *
+   *  @param e the ART event
+   *  @param _particleLabel the PFP producer module
+   *  @param _showerLabel the track producer module
+   *  @param pfp_v_v output, a vector of vector of PFP (a vector of TPC objects)
+   *  @param shower_v_v output, a vector of vector of tracks (a vector of TPC objects)
+   */
+  static void GetTPCObjects(art::Event const & e, std::string _particleLabel, std::string _trackLabel, std::vector<lar_pandora::PFParticleVector> & pfp_v_v, std::vector<lar_pandora::ShowerVector> & shower_v_v);
+
+  /**
+   *  @brief Constructs TPC objects using Pandora PFP slices
+   *
+   *  @param e the ART event
+   *  @param _particleLabel the PFP producer module
+   *  @param _showerLabel the track producer module
+   *  @param pfp_v_v output, a vector of vector of PFP (a vector of TPC objects)
+   *  @param shower_v_v output, a vector of vector of tracks (a vector of TPC objects)
+   *  @param pfp_to_spacept ouput, a map from pfp to space points
+   *  @param spacept_to_hits ouput, a map from space points to recon hits
+   */
+  static void GetTPCObjects(art::Event const & e, std::string _particleLabel, std::string _showerLabel, std::vector<lar_pandora::PFParticleVector> & pfp_v_v, std::vector<lar_pandora::ShowerVector> & shower_v_v, lar_pandora::PFParticlesToSpacePoints & pfp_to_spacept, lar_pandora::SpacePointsToHits & spacept_to_hits);
+
+  /**
+   *  @brief Constructs TPC objects using Pandora PFP slices
+   *
+   *  @param pfParticleList the list of PFP
+   *  @param pfParticleToTrackMap map from PFP to tracks
+   *  @param pfParticleToVertexMap map from PFP to vertices
+   *  @param _particleLabel the PFP producer module
+   *  @param pfp_v_v output, a vector of vector of PFP (a vector of TPC objects)
+   *  @param shower_v_v output, a vector of vector of tracks (a vector of TPC objects)   */
+  static void GetTPCObjects(lar_pandora::PFParticleVector pfParticleList, lar_pandora::PFParticlesToShowers pfParticleToShowerMap, lar_pandora::PFParticlesToVertices  pfParticleToVertexMap, std::vector<lar_pandora::PFParticleVector> & pfp_v_v, std::vector<lar_pandora::ShowerVector> & shower_v_v);
+
+  /**
+   *  @brief Gets all the tracks and PFP for a single Pandora slice
+   *
+   *  @param pfParticleList the list of PFP
+   *  @param pfParticleToShowerMap map from PFP to showers
+   *  @param particle the PFP
+   *  @param pfp_v output, a vector of PFP (the TPC object)
+   *  @param shower_v output, a vector of showers (the TPC object)   */
+
+
   static void CollectTracksAndPFP(lar_pandora::PFParticlesToTracks pfParticleToTrackMap, lar_pandora::PFParticleVector pfParticleList, art::Ptr<recob::PFParticle> particle, lar_pandora::PFParticleVector &pfp_v, lar_pandora::TrackVector &track_v);
 
   /**
-   *  @brief Returns the nu recon vertex from a TPC object
+   *  @brief Returns the nu reco vertex from a TPC object
+   *
+   *  @param e the ART event
+   *  @param _particleLabel the PFP procuder module
+   *  @param pfp_v the TPC object (vector of PFP)
+   *  @param reco_nu_vtx output, the nu vertex (three dimensional array: x, y, z) */
+
+  static void CollectShowersAndPFP(lar_pandora::PFParticlesToShowers pfParticleToShowerMap, lar_pandora::PFParticleVector pfParticleList, art::Ptr<recob::PFParticle> particle, lar_pandora::PFParticleVector &pfp_v, lar_pandora::ShowerVector &shower_v);
+
+  /**
+   *  @brief Returns the nu reco vertex from a TPC object
    *
    *  @param e the ART event
    *  @param _particleLabel the PFP procuder module
@@ -188,6 +247,16 @@ class UBXSecHelper {
    *  @param _particleLabel the PFP procuder module
    *  @param trk the recob::Track
    *  @param nHitsReq the minimum number of hits */
+
+  static void GetNumberOfHitsPerPlane(art::Event const & e, std::string _particleLabel, lar_pandora::ShowerVector shower_v, int & nhits_u, int & nhits_v, int & nhits_w );
+
+  /**
+   *  @brief Returns true if the track passes a minimum hit requirment in at least one plane
+   *
+   *  @param e the ART event
+   *  @param _particleLabel the PFP procuder module
+   *  @param shwr the recob::Shower
+   *  @param nHitsReq the minimum number of hits */
   static bool TrackPassesHitRequirment(art::Event const & e, std::string _particleLabel, art::Ptr<recob::Track> trk, int nHitsReq);
 
   /**
@@ -195,6 +264,8 @@ class UBXSecHelper {
    *
    *  @param track the track
    *  @param vtx_ok is 0 if the vtx is in the FV, 1 otherwise  */
+  static bool ShowerPassesHitRequirement(art::Event const & e, std::string _particleLabel, art::Ptr<recob::Shower> shwr, int nHitsReq);
+
   static bool IsCrossingBoundary(recob::Track track, int & vtx_ok);
 
   /**

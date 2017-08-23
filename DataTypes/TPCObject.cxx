@@ -18,10 +18,11 @@ namespace ubana {
   void TPCObject::SetMultiplicity(int p, int t, int s)            { this->fPfpMult = p; this->fTrackMult = t; this->fShowerMult = s;}
 
   // Getter methods
-  const std::vector<recob::Track>       & TPCObject::GetTracks() const { return this->fTracks;      }
-  const std::vector<recob::PFParticle>  & TPCObject::GetPFPs()   const { return this->fPFParticles; }
-  const recob::Vertex                   & TPCObject::GetVertex() const { return this->fVertex;      }
-  const ubana::TPCObjectOrigin          & TPCObject::GetOrigin() const { return this->fOrigin;      }
+  const std::vector<recob::Track>       & TPCObject::GetTracks()  const { return this->fTracks;      }
+  const std::vector<recob::Shower>      & TPCObject::GetShowers() const { return this->fShowers;     }
+  const std::vector<recob::PFParticle>  & TPCObject::GetPFPs()    const { return this->fPFParticles; }
+  const recob::Vertex                   & TPCObject::GetVertex()  const { return this->fVertex;      }
+  const ubana::TPCObjectOrigin          & TPCObject::GetOrigin()  const { return this->fOrigin;      }
 
   const size_t TPCObject::GetNTracks()  const { return (this->fTracks).size();      }
   const size_t TPCObject::GetNPFP()     const { return (this->fPFParticles).size(); }

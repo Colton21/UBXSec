@@ -54,6 +54,7 @@ namespace ubana {
 
     // Getter methods
     const std::vector<recob::Track>      & GetTracks()   const;
+    const std::vector<recob::Shower>     & GetShowers()  const;
     const std::vector<recob::PFParticle> & GetPFPs()     const;
     const recob::Vertex                  & GetVertex()   const;
     const ubana::TPCObjectOrigin         & GetOrigin()   const;

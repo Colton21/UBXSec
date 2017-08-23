@@ -153,6 +153,7 @@ private:
   TTree* _tree1;
   int _run, _subrun, _event;
   int _is_reco;
+  bool _is_signal;
   double _reco_pur = -9999;
   double _reco_eff = -9999;
   double _true_mom = -9999;
@@ -857,7 +858,7 @@ void UBXSec::analyze(art::Event const & e) {
     pfp_v_v_shower.push_back(tpcobjToPFPAssns.at(slice));
   }
 
-  UBXSecHelper::GetTPCObjects(e, _pfp_pr ducer, pfp_v_v_track, track_v_v);
+  UBXSecHelper::GetTPCObjects(e, _pfp_producer, pfp_v_v_track, track_v_v);
   UBXSecHelper::GetTPCObjects(e, _pfp_producer, pfp_v_v_shower, shower_v_v);
 
   _nslices = pfp_v_v_track.size();
@@ -1240,7 +1241,14 @@ void UBXSec::analyze(art::Event const & e) {
     // Neutrino Flash match
     _slc_flsmatch_score[slice] = -9999;
     art::Ptr<recob::PFParticle> NuPFP = UBXSecHelper::GetNuPFP(pfp_v_v_shower[slice]);
-    std::vector<art::Ptr<ubana::FlashMatch>> pfpToFlashMatch_v = pfpToNeutrinoFlashMatchAssns.at(NuPFP.key());
+
+    /*
+ *
+ *  Was this a simple mistake???
+ *
+   */
+    std::vector<art::Ptr<ubana::FlashMatch>> pfpToFlashMatch_v = tpcobjToFlashMatchAssns.at(NuPFP.key());
+    //std::vector<art::Ptr<ubana::FlashMatch>> pfpToFlashMatch_v = pfpToNeutrinoFlashMatchAssns.at(NuPFP.key());
     if (pfpToFlashMatch_v.size() > 1) {
       std::cout << "    More than one flash match per nu pfp ?!" << std::endl;
       continue;

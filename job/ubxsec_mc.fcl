@@ -42,6 +42,12 @@ MCGhostProducer:              "RecoTrueMatcher"
 UseGENIEInfo:                 true
 MinimumHitRequirement:        3
 
+BeamSpillStart:	     	      5.0
+BeamSpillEnd:   	      16.0
+
+PrintDebug:		      true
+RecursiveMatching: 	      true
+
 PECalib:                      @local::SPECalib
 }
 

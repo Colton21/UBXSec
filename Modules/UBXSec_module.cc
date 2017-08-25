@@ -767,11 +767,19 @@ void UBXSec::analyze(art::Event const & e) {
   art::FindManyP<recob::Shower> showerss_from_pfp(pfp_h, e, _pfp_producer);
 
   // Get PID information
-  art::FindMany<anab::ParticleID> particleids_from_shower (shower_h, e, _particle_id_producer);
-  if (!particleids_from_shower.isValid()) {
-    std::cout << "[UBXSec] anab::ParticleID (shower) is not valid." << std::endl;
+  try
+  {
+    art::FindMany<anab::ParticleID> particleids_from_shower (shower_h, e, _particle_id_producer);
+
+    if (!particleids_from_shower.isValid()) {
+      std::cout << "[UBXSec] anab::ParticleID (shower) is not valid." << std::endl;
+    }
+    std::cout << "[UBXSec] Numeber of particleids_from_shower " << particleids_from_shower.size() << std::endl;
   }
-  std::cout << "[UBXSec] Numeber of particleids_from_shower " << particleids_from_shower.size() << std::endl;
+  catch(...)
+  {
+    std::cout << "Not Valid Shower Association!" << std::endl;
+  }
 
 
   // Get Ghosts
